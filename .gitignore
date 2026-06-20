@@ -1,0 +1,9 @@
+node_modules/
+lib/
+data/
+coverage/
+drizzle/
+*.db
+*.db-*
+.env
+.idea
