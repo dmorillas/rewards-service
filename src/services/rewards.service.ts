@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { injectable, inject } from "tsyringe";
-import { Reward, RewardAmount, RewardType, type RewardDefinitionContent } from "../domain/reward";
+import {Reward, RewardAmount, RewardType, type RewardDefinitionContent, FixedRewardEntry} from "../domain/reward";
 import { RewardsRepository } from "../repositories/rewards.repository";
 import { IdGeneratorService } from "./id.generator.service";
 import { NotFoundError, IllegalStatusError } from "../errors/errors";
@@ -75,5 +75,83 @@ export class RewardsService {
     }
 
     return definition;
+  }
+
+  async calculateReward(rewardId: string, rng: () => number = Math.random): Promise<Reward[]> {
+    const rewardToClaim = await this.repository.getRewardById(rewardId);
+
+    if (!rewardToClaim) {
+      throw new NotFoundError(`Reward '${rewardId}' not found`);
+    }
+
+    if (!rewardToClaim.enabled) {
+      throw new IllegalStatusError(`Reward '${rewardToClaim.name}' is disabled`);
+    }
+
+    const amountsFromFixedRewards = this.calculateFixedReward(rewardToClaim.content);
+    const amountsFromRandomRewards = this.calculateRandomReward(rewardToClaim.content, rng);
+
+    const totalEnergy = amountsFromFixedRewards.energy + amountsFromRandomRewards.energy;
+    const totalCurrency = amountsFromFixedRewards.currency + amountsFromRandomRewards.currency;
+    const totalXp = amountsFromFixedRewards.xp + amountsFromRandomRewards.xp;
+
+    const rewards: Reward[] = [];
+    if (totalEnergy > 0) rewards.push(new Reward(RewardType.Energy, totalEnergy));
+    if (totalCurrency > 0) rewards.push(new Reward(RewardType.Currency, totalCurrency));
+    if (totalXp > 0) rewards.push(new Reward(RewardType.Xp, totalXp));
+
+    return rewards;
+  }
+
+  private calculateFixedReward(content: RewardDefinitionContent[]): RewardAmount {
+    const amounts = new RewardAmount();
+
+    const fixedRewards = content.find((reward) => reward.type === "fixed");
+    if (fixedRewards) {
+      amounts.energy += this.sumByResource(fixedRewards.rewards, RewardType.Energy);
+      amounts.currency += this.sumByResource(fixedRewards.rewards, RewardType.Currency);
+      amounts.xp += this.sumByResource(fixedRewards.rewards, RewardType.Xp);
+    }
+
+    return amounts;
+  }
+
+  private calculateRandomReward(content: RewardDefinitionContent[], rng: () => number): RewardAmount {
+    const amounts = new RewardAmount();
+
+    const randomRewards = content.find((reward) => reward.type === "random");
+    if (randomRewards) {
+      const raffleNumber = Math.floor(rng() * 100);
+      let acc = 0;
+      let winner = randomRewards.rewards[0];
+      for (const reward of randomRewards.rewards) {
+        if (acc + reward.chance >= raffleNumber) {
+          winner = reward;
+          break;
+        }
+        acc += reward.chance;
+      }
+
+      let amount = 0;
+      if (winner?.amount !== undefined) {
+        amount = winner.amount;
+      } else if (winner) {
+        const min = winner.minAmount ?? 0;
+        const max = winner.maxAmount ?? min;
+        amount = Math.floor(rng() * (max - min + 1)) + min;
+      }
+
+      if (winner?.resource === RewardType.Energy) amounts.energy += amount;
+      if (winner?.resource === RewardType.Currency) amounts.currency += amount;
+      if (winner?.resource === RewardType.Xp) amounts.xp += amount;
+    }
+
+    return amounts;
+  }
+
+  private sumByResource(rewards: FixedRewardEntry[], resource: RewardType): number {
+    return rewards
+      .filter((reward) => reward.resource === resource)
+      .reduce((total, reward) => total + reward.amount, 0);
   }
 }

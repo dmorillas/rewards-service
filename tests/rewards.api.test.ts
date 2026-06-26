@@ -102,7 +102,7 @@ describe("rewards API", () => {
       .post("/api/v1/rewards")
       .send({ name: "api_calculate", content: fixedContent });
 
-    const response = await request(app).post(`/api/v1/rewards/${created.body.id}/calculate`);
+    const response = await request(app).post(`/api/v1/rewards/${created.body.id}/claim`);
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
@@ -119,7 +119,7 @@ describe("rewards API", () => {
       .post("/api/v1/rewards")
       .send({ name: "api_disabled", content: fixedContent, enabled: false });
 
-    const response = await request(app).post(`/api/v1/rewards/${created.body.id}/calculate`);
+    const response = await request(app).post(`/api/v1/rewards/${created.body.id}/claim`);
     expect(response.status).toBe(409);
   });
 
@@ -181,7 +181,7 @@ describe("rewards API", () => {
   });
 
   it("returns 404 when calculating an unknown reward", async () => {
-    const response = await request(app).post("/api/v1/rewards/missing/calculate");
+    const response = await request(app).post("/api/v1/rewards/missing/claim");
     expect(response.status).toBe(404);
   });
 

@@ -47,4 +47,11 @@ export class RewardsController {
         await this.rewardsService.deleteReward(id);
         res.status(204).send();
     }
+
+    claimReward = async (req: Request, res: Response) => {
+        const rewardId = req.params.id as string;
+        const rewards = await this.rewardsService.calculateReward(rewardId);
+
+        res.status(200).json({ rewardId, rewards });
+    }
 }

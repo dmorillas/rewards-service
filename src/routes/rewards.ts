@@ -11,5 +11,6 @@ router.post("/api/v1/rewards", validateReward, controller.createReward);
 router.get("/api/v1/rewards/:id", validateId, controller.getReward);
 router.patch("/api/v1/rewards/:id", validateId, validateRewardUpdate, controller.updateReward);
 router.delete("/api/v1/rewards/:id", validateId, controller.deleteReward);
+router.post("/api/v1/rewards/:id/claim", validateId, controller.claimReward);
 
 export default router;
